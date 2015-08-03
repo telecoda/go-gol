@@ -20,7 +20,7 @@ const titleColour = termbox.ColorYellow
 // Text in the UI
 const title = "GAME OF LIFE"
 
-const animationSpeed = 1 * time.Millisecond
+const animationSpeed = 200 * time.Millisecond
 
 const defaultMarginWidth = 2
 const defaultMarginHeight = 1
