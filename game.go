@@ -12,8 +12,8 @@ const boardWidth = 40
 const boardHeight = 40
 const numStates = 2
 const cellWidth = 2
-const bornFrames = 5
-const dyingFrames = 5
+const bornFrames = 2
+const dyingFrames = 2
 const backgroundColour = termbox.ColorBlack
 const titleColour = termbox.ColorYellow
 
@@ -64,43 +64,49 @@ type Cell struct {
 	animCount int
 }
 
+type Board struct {
+	cells [][]Cell
+}
+
 type Game struct {
-	board [][]Cell
+	board Board
 }
 
 // NewGame returns a fully-initialized game.
 func NewGame() *Game {
-	g := new(Game)
-	g.reset()
+	g := &Game{
+		board: newBoard(),
+	}
 	return g
 }
 
-// Reset the game in order to play again.
-func (g *Game) reset() {
-	g.board = make([][]Cell, boardHeight)
+func newBoard() Board {
+	b := Board{}
+	b.cells = make([][]Cell, boardHeight)
 	for y := 0; y < boardHeight; y++ {
-		g.board[y] = make([]Cell, boardWidth)
+		b.cells[y] = make([]Cell, boardWidth)
 		for x := 0; x < boardWidth; x++ {
+			b.cells[y][x] = Cell{}
 
 			rnd := rand.Int() % 50
 			if rnd < 6 {
-				g.board[y][x] = Cell{
+				b.cells[y][x] = Cell{
 					state:     Alive,
 					animState: AliveAnim,
 					animCount: 0,
 				}
 				births++
 			} else {
-				g.board[y][x] = Cell{
+				b.cells[y][x] = Cell{
 					state:     Empty,
 					animState: EmptyAnim,
 					animCount: 0,
 				}
-
 			}
 		}
 	}
 
+	return b
 }
 
 // This takes care of rendering everything.
@@ -112,7 +118,7 @@ func (g *Game) render() {
 
 	for y := 0; y < boardHeight; y++ {
 		for x := 0; x < boardWidth; x++ {
-			cell := g.board[y][x]
+			cell := g.board.cells[y][x]
 			absCellValue := int(cell.animState)
 			cellColor := lifeColours[absCellValue]
 			for i := 0; i < cellWidth; i++ {
@@ -129,25 +135,49 @@ func (g *Game) update() {
 
 	generations++
 
+	// copy board
+	boardCopy := g.board.copy()
+
+	g.board.updateCells(boardCopy)
+
 	for y := 0; y < boardHeight; y++ {
 		for x := 0; x < boardWidth; x++ {
+			g.board.updateCellAnimation(x, y)
+		}
+	}
+}
 
-			g.updateCellAnimation(x, y)
-			g.updateCellLives(x, y)
+// updateCells updates the cells based on a copy of the board so it doesn change
+func (b *Board) updateCells(boardCopy Board) {
 
+	for y := 0; y < boardHeight; y++ {
+		for x := 0; x < boardWidth; x++ {
+			b.updateCellLives(boardCopy, x, y)
 		}
 	}
 
 }
 
-func (g *Game) updateCellLives(x, y int) {
+func (b *Board) updateCellLives(bc Board, x, y int) {
 	// count live cells
-	liveCellsAround := g.getLiveCellCount(x, y)
-	cell := g.getCell(x, y)
+	liveCellsAround := bc.getLiveCellCount(x, y)
+	cell := b.getCell(x, y)
 
+	// Any live cell with two or three neighbors survives.
+	if cell.state == Alive && (liveCellsAround == 2 || liveCellsAround == 3) {
+		// cell lives
+		b.cells[y][x] = Cell{
+			state:     Alive,
+			animState: AliveAnim,
+			animCount: 0,
+		}
+		return
+	}
+
+	// Any dead cell with three live neighbors becomes a live cell.
 	if cell.state == Empty && liveCellsAround == 3 {
 		// cell is born
-		g.board[y][x] = Cell{
+		b.cells[y][x] = Cell{
 			state:     Alive,
 			animState: BornAnim,
 			animCount: bornFrames,
@@ -155,28 +185,12 @@ func (g *Game) updateCellLives(x, y int) {
 		births++
 		return
 	}
-	if cell.state == Alive && liveCellsAround < 2 {
+
+	// All other live cells die in the next generation.
+	// Similarly, all other dead cells stay dead.
+	if cell.state == Alive {
 		// cell dies
-		g.board[y][x] = Cell{
-			state:     Empty,
-			animState: DyingAnim,
-			animCount: dyingFrames,
-		}
-		deaths++
-		return
-	}
-	if cell.state == Alive && (liveCellsAround == 2 || liveCellsAround == 3) {
-		// cell lives
-		g.board[y][x] = Cell{
-			state:     Alive,
-			animState: AliveAnim,
-			animCount: 0,
-		}
-		return
-	}
-	if cell.state == Alive && liveCellsAround > 3 {
-		// cell dies - overcrowding
-		g.board[y][x] = Cell{
+		b.cells[y][x] = Cell{
 			state:     Empty,
 			animState: DyingAnim,
 			animCount: dyingFrames,
@@ -186,11 +200,11 @@ func (g *Game) updateCellLives(x, y int) {
 	}
 }
 
-func (g *Game) updateCellAnimation(x, y int) {
-	cell := g.getCell(x, y)
+func (b *Board) updateCellAnimation(x, y int) {
+	cell := b.getCell(x, y)
 	if cell.animCount > 0 {
 		cell.animCount--
-		g.board[y][x] = cell
+		b.cells[y][x] = cell
 	}
 
 	if cell.animCount != 0 {
@@ -198,7 +212,7 @@ func (g *Game) updateCellAnimation(x, y int) {
 	}
 
 	if cell.animState == DyingAnim {
-		g.board[y][x] = Cell{
+		b.cells[y][x] = Cell{
 			state:     Empty,
 			animState: EmptyAnim,
 			animCount: 0,
@@ -206,7 +220,7 @@ func (g *Game) updateCellAnimation(x, y int) {
 		return
 	}
 	if cell.animState == BornAnim {
-		g.board[y][x] = Cell{
+		b.cells[y][x] = Cell{
 			state:     Alive,
 			animState: AliveAnim,
 			animCount: 0,
@@ -215,15 +229,29 @@ func (g *Game) updateCellAnimation(x, y int) {
 	}
 }
 
-func (g *Game) getCell(x, y int) Cell {
+func (b *Board) copy() Board {
+	newBoard := Board{
+		cells: make([][]Cell, len(b.cells)),
+	}
+	// copy rows
+	for r, row := range b.cells {
+		newBoard.cells[r] = make([]Cell, len(row))
+		for c, cell := range row {
+			newBoard.cells[r][c] = cell
+		}
+	}
+	return newBoard
+}
+
+func (b *Board) getCell(x, y int) Cell {
 	if x < 0 || x > boardWidth-1 || y < 0 || y > boardHeight-1 {
 		return Cell{state: Empty} // return empty cell if off board
 	}
 
-	return g.board[y][x]
+	return b.cells[y][x]
 }
 
-func (g *Game) getLiveCellCount(x, y int) int {
+func (b *Board) getLiveCellCount(x, y int) int {
 	// check all surrounding cells
 	count := 0
 
@@ -233,7 +261,7 @@ func (g *Game) getLiveCellCount(x, y int) int {
 				// current cell, don't check
 				continue
 			}
-			cell := g.getCell(cx, cy)
+			cell := b.getCell(cx, cy)
 			if cell.state == Alive {
 				count++
 			}

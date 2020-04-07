@@ -40,7 +40,6 @@ func main() {
 				}
 			}
 		default:
-			//g.updateState()
 			g.update()
 			g.render()
 			time.Sleep(animationSpeed)
