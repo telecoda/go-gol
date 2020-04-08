@@ -7,4 +7,4 @@ Simple implementation of [Conway's Game of Life](https://en.wikipedia.org/wiki/C
 
 Inspired by the use of [termbox](https://github.com/nsf/termbox-go) in [gotetris](https://github.com/jjinux/gotetris)
 
-[Video here:](https://www.youtube.com/watch?v=nBXV65gab7I)https://www.youtube.com/watch?v=nBXV65gab7I
+[Video here:](https://www.youtube.com/watch?v=8RZkgyREbzE)https://www.youtube.com/watch?v=8RZkgyREbzE
